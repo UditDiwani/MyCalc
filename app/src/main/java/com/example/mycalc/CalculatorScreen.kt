@@ -34,50 +34,38 @@ fun CalculatorButton(
 fun CalculatorScreen() {
 
     var display by remember { mutableStateOf("0")}
+    var keypad = listOf(
+        listOf("7","8","9"),
+        listOf("4","5","6"),
+        listOf("1","2","3"),
+        listOf(".","0","=")
+    )
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ){
-        val numbers = listOf("7","8","9")
         Text(display)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ){
-            numbers.forEach{number -> 
-                CalculatorButton(
-                text = number ,
-                onNumberClick = { pressedNumber -> 
-                display = if( display == "0"){
-                    pressedNumber
+        keypad.forEach{ row -> 
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(32.dp)
+            ){
+                row.forEach{ key -> 
+                    CalculatorButton(
+                        text = key,
+                        onNumberClick =  { pressedKey ->
+                            if (pressedKey.all {it.isDigit()}){
+                                display = if (display == "0"){
+                                    pressedKey
+                                }
+                                else{
+                                    display + pressedKey
+                                }
+                            }
+                        }
+                    ) 
                 }
-                else{
-                    display + pressedNumber
-                }
-                }
-                ) 
             }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ){
-            Text("4")
-            Text("5")
-            Text("6")
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ){
-            Text("1")
-            Text("2")
-            Text("3")
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ){
-            Text("0")
-            Text(".")
-            Text("=")
         }
     }
 }
