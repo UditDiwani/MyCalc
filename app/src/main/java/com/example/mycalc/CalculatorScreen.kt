@@ -17,16 +17,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import jdk.dynalink.linker.support.CompositeTypeBasedGuardingDynamicLinker
 
 @Composable
 fun CalculatorButton(
     text: String,
-    onNumberClick: (String) -> Unit
+    onClick: (String) -> Unit
 ){
     Button(
-        onClick = {onNumberClick(text)}
+        onClick = {onClick(text)}
     ){
         Text(text)
+    }
+}
+
+fun FormatResult(result: Double) : String{
+    return if ( result % 1.0 == 0.0){
+        result.toLong().toString()
+    }
+    else{
+        result.toString()
     }
 }
 
@@ -34,11 +44,40 @@ fun CalculatorButton(
 fun CalculatorScreen() {
 
     var display by remember { mutableStateOf("0")}
+    var firstNumber by remember { mutableStateOf<Double?>(null)}
+    var operator by remember { mutableStateOf<String?>(null)}
     var keypad = listOf(
-        listOf("7","8","9"),
-        listOf("4","5","6"),
-        listOf("1","2","3"),
-        listOf(".","0","=")
+        listOf(
+            CalculatorKey("AC", KeyType.CLEAR),
+            CalculatorKey("⌫", KeyType.DELETE),
+            CalculatorKey("%", KeyType.PERCENT),
+            CalculatorKey("÷", KeyType.OPERATOR)
+        ),
+        listOf(
+            CalculatorKey("7", KeyType.NUMBER),
+            CalculatorKey("8", KeyType.NUMBER),
+            CalculatorKey("9", KeyType.NUMBER),
+            CalculatorKey("×", KeyType.OPERATOR)
+        ),
+        listOf(
+            CalculatorKey("4", KeyType.NUMBER),
+            CalculatorKey("5", KeyType.NUMBER),
+            CalculatorKey("6", KeyType.NUMBER),
+            CalculatorKey("-", KeyType.OPERATOR)
+        ),
+        listOf(
+            CalculatorKey("1", KeyType.NUMBER),
+            CalculatorKey("2", KeyType.NUMBER),
+            CalculatorKey("3", KeyType.NUMBER),
+            CalculatorKey("+", KeyType.OPERATOR)
+        ),
+        listOf(
+            CalculatorKey("+/-", KeyType.SIGN),
+            CalculatorKey("0", KeyType.NUMBER),
+            CalculatorKey(".", KeyType.DECIMAL),
+            CalculatorKey("=", KeyType.EQUALS)
+        )
+
     )
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -52,14 +91,73 @@ fun CalculatorScreen() {
             ){
                 row.forEach{ key -> 
                     CalculatorButton(
-                        text = key,
-                        onNumberClick =  { pressedKey ->
-                            if (pressedKey.all {it.isDigit()}){
-                                display = if (display == "0"){
-                                    pressedKey
+                        text = key.label,
+                         onClick =  { pressedKey ->
+                            when (key.type){
+                                KeyType.NUMBER -> {
+                                    display = if(display == "0"){
+                                        pressedKey
+                                    }
+                                    else{
+                                        display + pressedKey
+                                    }
                                 }
-                                else{
-                                    display + pressedKey
+                                KeyType.DECIMAL -> {
+                                    if(!display.contains(".")){
+                                        display += "."
+                                    }
+                                }
+                                KeyType.OPERATOR -> {
+                                    firstNumber = display.toDouble()
+                                    operator = pressedKey
+                                    display = "0"
+                                }
+                                KeyType.EQUALS -> {
+                                    var secondNumber = display.toDouble()
+                                    var result = when(operator) {
+                                        "+" -> firstNumber!! + secondNumber
+                                        "-" -> firstNumber!! - secondNumber
+                                        "×" -> firstNumber!! * secondNumber
+                                        "÷" -> firstNumber!! / secondNumber
+                                        else -> secondNumber
+                                    }
+                                    display = FormatResult(result)
+                                }
+                                KeyType.CLEAR -> {
+                                    display = "0"
+                                    firstNumber = null
+                                    operator = null
+                                }
+                                KeyType.DELETE -> {
+                                    display = if (display.length > 1){
+                                        display.dropLast(1)
+                                    }
+                                    else{
+                                        "0"
+                                    }
+                                }
+                                KeyType.SIGN -> {
+                                    display = if (display.startsWith("-")){
+                                        display.drop(1)
+                                    }
+                                    else{
+                                        "-$display"
+                                    }
+                                }
+                                KeyType.PERCENT -> {
+                                    var secondNumber = display.toDouble()
+                                    
+                                    display = when (operator){
+                                        "+","-" ->{
+                                            FormatResult(firstNumber!! * secondNumber/100)
+                                        }
+                                        "×","÷" -> {
+                                            FormatResult(secondNumber / 100)
+                                        }
+                                        else -> {
+                                            FormatResult(secondNumber / 100)
+                                        }
+                                    }
                                 }
                             }
                         }
