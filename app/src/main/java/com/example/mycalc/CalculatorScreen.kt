@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import jdk.dynalink.linker.support.CompositeTypeBasedGuardingDynamicLinker
+import kotlin.math.round
 
 @Composable
 fun CalculatorButton(
@@ -32,11 +33,14 @@ fun CalculatorButton(
 }
 
 fun FormatResult(result: Double) : String{
-    return if ( result % 1.0 == 0.0){
-        result.toLong().toString()
+    
+    val rounded = kotlin.math.round(result * 1_000_000_000) / 1_000_000_000 
+
+    return if ( rounded % 1.0 == 0.0){
+        rounded.toLong().toString()
     }
     else{
-        result.toString()
+        rounded.toString()
     }
 }
 
@@ -46,6 +50,9 @@ fun CalculatorScreen() {
     var display by remember { mutableStateOf("0")}
     var firstNumber by remember { mutableStateOf<Double?>(null)}
     var operator by remember { mutableStateOf<String?>(null)}
+    var justCalculated by remember { mutableStateOf(false)}
+    var lastOperand by remember { mutableStateOf<Double?>(null)}
+
     var keypad = listOf(
         listOf(
             CalculatorKey("AC", KeyType.CLEAR),
@@ -84,6 +91,11 @@ fun CalculatorScreen() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ){
+        if(firstNumber != null && operator != null){
+            Text(
+                text = "${FormatResult(firstNumber!!)} $operator"
+            )
+        }
         Text(display)
         keypad.forEach{ row -> 
             Row(
@@ -95,38 +107,84 @@ fun CalculatorScreen() {
                          onClick =  { pressedKey ->
                             when (key.type){
                                 KeyType.NUMBER -> {
-                                    display = if(display == "0"){
-                                        pressedKey
+                                    if(justCalculated){
+                                        display = pressedKey
+                                        justCalculated = false
+                                        lastOperand = null
+                                        firstNumber = null
+                                        operator = null
                                     }
                                     else{
-                                        display + pressedKey
+                                        display = if(display == "0" || display == "Error"){
+                                            pressedKey
+                                        }
+                                        else{
+                                            display + pressedKey
+                                        }
                                     }
                                 }
                                 KeyType.DECIMAL -> {
+                                    if(display == "Error" || justCalculated){
+                                        display = "0."
+                                        justCalculated = false
+                                    }
                                     if(!display.contains(".")){
                                         display += "."
                                     }
                                 }
                                 KeyType.OPERATOR -> {
-                                    firstNumber = display.toDouble()
+                                    if(justCalculated){
+                                        firstNumber = display.toDouble()
+                                        display = "0"
+                                        lastOperand = null
+                                        justCalculated = false
+                                    }
+                                    if(operator==null){
+                                        firstNumber = display.toDouble()
+                                        display = "0"
+                                    }
                                     operator = pressedKey
-                                    display = "0"
                                 }
                                 KeyType.EQUALS -> {
-                                    var secondNumber = display.toDouble()
-                                    var result = when(operator) {
+                                    val secondNumber = if(justCalculated){
+                                        lastOperand
+                                    }
+                                    else{
+                                        display.toDouble()
+                                    }
+                                    if(firstNumber!=null && operator!=null && secondNumber!=null){
+                                        var result = when(operator) {
                                         "+" -> firstNumber!! + secondNumber
                                         "-" -> firstNumber!! - secondNumber
                                         "×" -> firstNumber!! * secondNumber
-                                        "÷" -> firstNumber!! / secondNumber
+                                        "÷" -> {
+                                            if (secondNumber == 0.0){
+                                                null
+                                            }
+                                            else{
+                                                firstNumber!! / secondNumber
+                                            }
+                                        }
                                         else -> secondNumber
-                                    }
-                                    display = FormatResult(result)
+                                        }   
+                                        if ( result == null || result.isNaN() || result.isInfinite()){
+                                            display = "Error"
+                                        }
+                                        else{
+                                            display = FormatResult(result)
+                                            if(!justCalculated){
+                                                lastOperand = secondNumber
+                                            }
+                                            firstNumber = result
+                                            justCalculated = true
+                                        }}
                                 }
                                 KeyType.CLEAR -> {
                                     display = "0"
                                     firstNumber = null
                                     operator = null
+                                    lastOperand = null
+                                    justCalculated = false
                                 }
                                 KeyType.DELETE -> {
                                     display = if (display.length > 1){
@@ -135,13 +193,16 @@ fun CalculatorScreen() {
                                     else{
                                         "0"
                                     }
+                                    justCalculated = false
                                 }
                                 KeyType.SIGN -> {
-                                    display = if (display.startsWith("-")){
-                                        display.drop(1)
-                                    }
-                                    else{
-                                        "-$display"
+                                    if(display != "0" && display !="Error"){
+                                        display = if (display.startsWith("-")){
+                                            display.drop(1)
+                                        }
+                                        else{
+                                            "-$display"
+                                        }
                                     }
                                 }
                                 KeyType.PERCENT -> {
